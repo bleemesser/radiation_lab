@@ -116,7 +116,7 @@ for file in os.listdir("csv"):
         "Counts": counts,
         "NCR": normalized_count_rate,
         "NCR Uncertainty": ncr_uncertainty,
-        "Minimized SValue": [result.fun] + [np.nan] * (len(x) - 1),
+        "Minimized S-Value": [result.fun] + [np.nan] * (len(x) - 1),
         "Optimal Half-Thickness": [t_opt] + [np.nan] * (len(x) - 1)
     })
     df_data.to_excel(f"excel/{source}_{absorber}.xlsx", index=False)
