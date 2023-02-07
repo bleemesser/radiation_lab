@@ -12,22 +12,26 @@ if not os.path.exists("plots"):
 if not os.path.exists("excel"):
     os.mkdir("excel")
 
+
 def power_law(x, t):
     return 0.5 ** (x / t)
+
 
 def s_statistic(t, x, y, uncertainty):
     model = power_law(x, t)
     s = np.sum(((y - model) / uncertainty) ** 2)
-    
+
     return s
+
 
 def calc_corrected_rate(counts, time):
     counts_per_second = counts / time
     unc_counts_per_second = np.sqrt(counts) / time
-    corrected_rate = counts_per_second / (1-(counts_per_second/3500))
-    correction_factor = 1/(1-(counts_per_second/3500))
+    corrected_rate = counts_per_second / (1 - (counts_per_second / 3500))
+    correction_factor = 1 / (1 - (counts_per_second / 3500))
     unc_corrected_rate = correction_factor * unc_counts_per_second
     return corrected_rate, unc_corrected_rate
+
 
 def calc_net_rate(corrected_rate, unc_corrected_rate, bg_counts, bg_time):
     corrected_rate_bg, unc_corrected_rate_bg = calc_corrected_rate(bg_counts, bg_time)
@@ -35,12 +39,26 @@ def calc_net_rate(corrected_rate, unc_corrected_rate, bg_counts, bg_time):
     unc_net_rate = np.sqrt(unc_corrected_rate ** 2 + unc_corrected_rate_bg ** 2)
     return net_rate, unc_net_rate
 
-def calc_normalized_count_rate(net_rate, unc_net_rate, no_abs_counts, no_abs_time, bg_counts, bg_time):
-    corrected_rate_no_abs, unc_corrected_rate_no_abs = calc_corrected_rate(no_abs_counts, no_abs_time)
-    net_rate_no_abs, unc_net_rate_no_abs = calc_net_rate(corrected_rate_no_abs, unc_corrected_rate_no_abs, bg_counts, bg_time)
+
+def calc_normalized_count_rate(
+    net_rate, unc_net_rate, no_abs_counts, no_abs_time, bg_counts, bg_time
+):
+    corrected_rate_no_abs, unc_corrected_rate_no_abs = calc_corrected_rate(
+        no_abs_counts, no_abs_time
+    )
+    net_rate_no_abs, unc_net_rate_no_abs = calc_net_rate(
+        corrected_rate_no_abs, unc_corrected_rate_no_abs, bg_counts, bg_time
+    )
     normalized_count_rate = net_rate / net_rate_no_abs
-    ncr_uncertainty = np.sqrt((unc_net_rate / net_rate)**2 + (unc_net_rate_no_abs / net_rate_no_abs)**2) * normalized_count_rate
+    ncr_uncertainty = (
+        np.sqrt(
+            (unc_net_rate / net_rate) ** 2
+            + (unc_net_rate_no_abs / net_rate_no_abs) ** 2
+        )
+        * normalized_count_rate
+    )
     return normalized_count_rate, ncr_uncertainty
+
 
 for file in os.listdir("csv"):
     print(f"Processing {file}...")
@@ -49,16 +67,20 @@ for file in os.listdir("csv"):
     thickness = df["thickness"]
     counts = df["counts"]
     time = df["time"]
-    
+
     bg_counts = df["bg_counts"][0]
     bg_time = df["bg_time"][0]
     no_abs_counts = df["no_abs_counts"][0]
     no_abs_time = df["no_abs_time"][0]
-    
+
     corrected_rate, unc_corrected_rate = calc_corrected_rate(counts, time)
-    net_rate, unc_net_rate = calc_net_rate(corrected_rate, unc_corrected_rate, bg_counts, bg_time)
-    normalized_count_rate, ncr_uncertainty = calc_normalized_count_rate(net_rate, unc_net_rate, no_abs_counts, no_abs_time, bg_counts, bg_time)
-    x,y = thickness, normalized_count_rate
+    net_rate, unc_net_rate = calc_net_rate(
+        corrected_rate, unc_corrected_rate, bg_counts, bg_time
+    )
+    normalized_count_rate, ncr_uncertainty = calc_normalized_count_rate(
+        net_rate, unc_net_rate, no_abs_counts, no_abs_time, bg_counts, bg_time
+    )
+    x, y = thickness, normalized_count_rate
     uncertainty = ncr_uncertainty
     source = file.split("_")[0]
     absorber = file.split("_")[1].split(".")[0]
@@ -87,9 +109,7 @@ for file in os.listdir("csv"):
     plt.errorbar(x, y, yerr=uncertainty, fmt="o", label="data", ecolor="black", ms=3)
     plt.plot(x, y_fit, label=r"fit, $y = 0.5^{x/t}$, $t=%.3f$" % t_opt)
     plt.xlabel(
-        "Layers of tissue"
-        if absorber == "tissue"
-        else f"Thickness of {absorber} (in)"
+        "Layers of tissue" if absorber == "tissue" else f"Thickness of {absorber} (in)"
     )
     plt.ylabel("Normalized count rate")
     plt.title(f"{source} source with {absorber} absorber")
@@ -107,17 +127,18 @@ for file in os.listdir("csv"):
     plt.axhline(len(x) - 1, color="green", label=f"Expected value of s: {len(x) - 1}")
     plt.legend()
     plt.savefig(f"plots/{source}_{absorber}.png")
-    df_data = pd.DataFrame({
-        "Source": source,
-        "Material": absorber,
-        "Absorber Letter": material,
-        "Absorber Thickness": thickness,
-        "Time": time,
-        "Counts": counts,
-        "NCR": normalized_count_rate,
-        "NCR Uncertainty": ncr_uncertainty,
-        "Minimized S-Value": [result.fun] + [np.nan] * (len(x) - 1),
-        "Optimal Half-Thickness": [t_opt] + [np.nan] * (len(x) - 1)
-    })
+    df_data = pd.DataFrame(
+        {
+            "Source": source,
+            "Material": absorber,
+            "Absorber Letter": material,
+            "Absorber Thickness": thickness,
+            "Time": time,
+            "Counts": counts,
+            "NCR": normalized_count_rate,
+            "NCR Uncertainty": ncr_uncertainty,
+            "Minimized S-Value": [result.fun] + [np.nan] * (len(x) - 1),
+            "Optimal Half-Thickness": [t_opt] + [np.nan] * (len(x) - 1),
+        }
+    )
     df_data.to_excel(f"excel/{source}_{absorber}.xlsx", index=False)
-    
