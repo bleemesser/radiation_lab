@@ -4,6 +4,14 @@ import scipy.optimize as optimize
 import pandas as pd
 import os
 
+# check if csv, plots, and excel directories exist
+if not os.path.exists("csv"):
+    os.mkdir("csv")
+if not os.path.exists("plots"):
+    os.mkdir("plots")
+if not os.path.exists("excel"):
+    os.mkdir("excel")
+
 def power_law(x, t):
     return 0.5 ** (x / t)
 
@@ -34,9 +42,6 @@ def calc_normalized_count_rate(net_rate, unc_net_rate, no_abs_counts, no_abs_tim
     ncr_uncertainty = np.sqrt((unc_net_rate / net_rate)**2 + (unc_net_rate_no_abs / net_rate_no_abs)**2) * normalized_count_rate
     return normalized_count_rate, ncr_uncertainty
 
-# final_df = pd.DataFrame(columns=[
-#     "Source", "Material","Absorber Letter", "Absorber Thickness", "Time", "Counts", "NCR", "NCR Uncertainty"
-# ])
 for file in os.listdir("csv"):
     print(f"Processing {file}...")
     df = pd.read_csv("csv/" + file)
