@@ -3,6 +3,7 @@ import numpy as np
 import scipy.optimize as optimize
 import pandas as pd
 import os
+from scipy.optimize import minimize, bisect
 
 # check if csv, plots, and excel directories exist
 if not os.path.exists("csv"):
@@ -22,6 +23,17 @@ def s_statistic(t, x, y, uncertainty):
     s = np.sum(((y - model) / uncertainty) ** 2)
 
     return s
+
+
+def find_t_values(x, y, uncertainty):
+    res = minimize(s_statistic, t0, args=(x, y, uncertainty))
+    min_s = res.fun
+    t_min = res.x[0]
+    target = min_s + 1
+    t1 = bisect(lambda t: s_statistic(t, x, y, uncertainty) - target, t_min, t_min + 10)
+    t2 = bisect(lambda t: s_statistic(t, x, y, uncertainty) - target, t_min - 10, t_min)
+
+    return t1, t2
 
 
 def calc_corrected_rate(counts, time):
@@ -82,10 +94,11 @@ for file in os.listdir("csv"):
     )
     x, y = thickness, normalized_count_rate
     uncertainty = ncr_uncertainty
+    x_max = np.max(x)
     source = file.split("_")[0]
     absorber = file.split("_")[1].split(".")[0]
     t0 = 0.1
-    result = optimize.minimize(s_statistic, t0, args=(x, y, uncertainty))
+    result = minimize(s_statistic, t0, args=(x, y, uncertainty))
     # the above line is equivalent to the following commented out lines, but more accurate and efficient
     #### min_s = None
     #### t_opt = None
@@ -99,15 +112,28 @@ for file in os.listdir("csv"):
     #### print(f"Optimal value of t: {t_opt}")
     #### print(f"Minimum value of s achieved: {min_s}")
     t_opt = result.x[0]
-    y_fit = power_law(x, t_opt)
+    y_fit = power_law(np.linspace(0, x_max, 100), t_opt)
+    s_min = result.fun
 
+    # find the quadratic function that represents the s-value vs t curve
+    # print(f"S-value vs t curve: s = {s_min} + *(t-{t_opt})^2")
+    t1, t2 = find_t_values(x, y, uncertainty)
+    s_values = [
+        s_statistic(t, x, y, uncertainty) for t in np.linspace(0,1, 100)
+    ]
     print("Optimal value of t:", t_opt)
-    print("Minimum value of s achieved:", result.fun)
+    print(f"Optimal t-value uncertainty: ±{abs(t_opt - t1):.5f}")
+    print("Minimum value of s achieved:", s_min)
     print(f"Expected value of s: {len(x)-1}")
+
     plt.figure(figsize=(12, 6))
     plt.subplot(121)
     plt.errorbar(x, y, yerr=uncertainty, fmt="o", label="data", ecolor="black", ms=3)
-    plt.plot(x, y_fit, label=r"fit, $y = 0.5^{x/t}$, $t=%.3f$" % t_opt)
+    plt.plot(
+        np.linspace(0, x_max, 100),
+        y_fit,
+        label=r"fit, $y=(0.5)^{x/t}$" + f", t={t_opt:.3f} ± {abs(t_opt - t1):.5f}",
+    )
     plt.xlabel(
         "Layers of tissue" if absorber == "tissue" else f"Thickness of {absorber} (in)"
     )
@@ -117,19 +143,19 @@ for file in os.listdir("csv"):
     plt.grid()
 
     plt.subplot(122)
-    s_values = [s_statistic(t, x, y, uncertainty) for t in np.linspace(0.01, 1, 100)]
-    plt.plot(np.linspace(0.01, 1, 100), s_values)
+    plt.plot(np.linspace(0, 1, 100), s_values)
     plt.xlabel("t")
     plt.ylabel("s-value")
     plt.title("s-value vs t")
     plt.grid()
+
     plt.plot(t_opt, result.fun, "ro", label=f"Lowest s value: {result.fun:.3f}")
     plt.axhline(len(x) - 1, color="green", label=f"Expected value of s: {len(x) - 1}")
     plt.legend()
     plt.savefig(f"plots/{source}_{absorber}.png")
     df_data = pd.DataFrame(
         {
-            "Source": source,
+            "Source": [source] + [np.nan] * (len(x) - 1),
             "Material": absorber,
             "Absorber Letter": material,
             "Absorber Thickness": thickness,
@@ -139,6 +165,8 @@ for file in os.listdir("csv"):
             "NCR Uncertainty": ncr_uncertainty,
             "Minimized S-Value": [result.fun] + [np.nan] * (len(x) - 1),
             "Optimal Half-Thickness": [t_opt] + [np.nan] * (len(x) - 1),
+            "Optimal Half-Thickness Uncertainty": [f"±{abs(t_opt - t1)}"]
+            + [np.nan] * (len(x) - 1),
         }
     )
     df_data.to_excel(f"excel/{source}_{absorber}.xlsx", index=False)
