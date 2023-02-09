@@ -119,7 +119,7 @@ for file in os.listdir("csv"):
     # print(f"S-value vs t curve: s = {s_min} + *(t-{t_opt})^2")
     t1, t2 = find_t_values(x, y, uncertainty)
     s_values = [
-        s_statistic(t, x, y, uncertainty) for t in np.linspace(0,1, 100)
+        s_statistic(t, x, y, uncertainty) for t in np.linspace(t_opt -t_opt/10, t_opt + t_opt/10, 100)
     ]
     print("Optimal value of t:", t_opt)
     print(f"Optimal t-value uncertainty: ±{abs(t_opt - t1):.5f}")
@@ -132,7 +132,8 @@ for file in os.listdir("csv"):
     plt.plot(
         np.linspace(0, x_max, 100),
         y_fit,
-        label=r"fit, $y=(0.5)^{x/t}$" + f", t={t_opt:.3f} ± {abs(t_opt - t1):.5f}",
+        c="grey",
+        label=r"fit, $y=(0.5)^{x/t}$" + f", t={t_opt:.3f} ± {abs(t_opt - t1):.5f}\nconfidence = 0.68",
     )
     plt.xlabel(
         "Layers of tissue" if absorber == "tissue" else f"Thickness of {absorber} (in)"
@@ -143,14 +144,17 @@ for file in os.listdir("csv"):
     plt.grid()
 
     plt.subplot(122)
-    plt.plot(np.linspace(0, 1, 100), s_values)
+    plt.plot(np.linspace(t_opt -t_opt/10, t_opt + t_opt/10, 100), s_values, c="grey", label="s-value vs t curve")
     plt.xlabel("t")
     plt.ylabel("s-value")
     plt.title("s-value vs t")
     plt.grid()
 
     plt.plot(t_opt, result.fun, "ro", label=f"Lowest s value: {result.fun:.3f}")
-    plt.axhline(len(x) - 1, color="green", label=f"Expected value of s: {len(x) - 1}")
+    # color of these points should be green
+    plt.plot(t1, s_statistic(t1, x, y, uncertainty),c="black", marker="o")
+    plt.plot(t2, s_statistic(t2, x, y, uncertainty), c="black", marker="o")
+    plt.axhline(len(x) - 1, color="cornflowerblue", label=f"Expected value of s: {len(x) - 1}")
     plt.legend()
     plt.savefig(f"plots/{source}_{absorber}.png")
     df_data = pd.DataFrame(
