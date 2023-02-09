@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.optimize as optimize
 import pandas as pd
 import os
 from scipy.optimize import minimize, bisect
