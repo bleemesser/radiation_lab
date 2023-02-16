@@ -16,12 +16,14 @@ if not os.path.exists("excel"):
 def power_law(x, t):
     return 0.5 ** (x / t)
 
+
 # calculate the s-statistic for a given value of t
 def s_statistic(t, x, y, uncertainty):
     model = power_law(x, t)
     s = np.sum(((y - model) / uncertainty) ** 2)
 
     return s
+
 
 # for determining error in half-thickness: find the t-values that correspond to the s-value that is 1 greater than the minimum s-value (for 0.68 confidence)
 def find_t_values(x, y, uncertainty):
@@ -34,6 +36,7 @@ def find_t_values(x, y, uncertainty):
 
     return t1, t2
 
+
 # apply the correction factor to the raw count rate
 def calc_corrected_rate(counts, time):
     counts_per_second = counts / time
@@ -43,12 +46,14 @@ def calc_corrected_rate(counts, time):
     unc_corrected_rate = correction_factor * unc_counts_per_second
     return corrected_rate, unc_corrected_rate
 
+
 # subtract the background count rate from the corrected count rate
 def calc_net_rate(corrected_rate, unc_corrected_rate, bg_counts, bg_time):
     corrected_rate_bg, unc_corrected_rate_bg = calc_corrected_rate(bg_counts, bg_time)
     net_rate = corrected_rate - corrected_rate_bg
     unc_net_rate = np.sqrt(unc_corrected_rate ** 2 + unc_corrected_rate_bg ** 2)
     return net_rate, unc_net_rate
+
 
 # normalize the net count rate by the net count rate when there is no absorber
 def calc_normalized_count_rate(
@@ -70,11 +75,12 @@ def calc_normalized_count_rate(
     )
     return normalized_count_rate, ncr_uncertainty
 
+
 # loop through all the csv files in the csv directory...
 for file in os.listdir("csv"):
     print(f"Processing {file}...")
     df = pd.read_csv("csv/" + file)
-    
+
     material = df["material"]
     thickness = df["thickness"]
     counts = df["counts"]
@@ -116,13 +122,14 @@ for file in os.listdir("csv"):
     t_opt = result.x[0]
     y_fit = power_law(np.linspace(0, x_max, 100), t_opt)
     s_min = result.fun
-    
+
     # find the uncertainty in the optimal value of t
     t1, t2 = find_t_values(x, y, uncertainty)
-    
+
     # calculate values of s for a range of t values
     s_values = [
-        s_statistic(t, x, y, uncertainty) for t in np.linspace(t_opt -t_opt/10, t_opt + t_opt/10, 100)
+        s_statistic(t, x, y, uncertainty)
+        for t in np.linspace(t_opt - t_opt / 10, t_opt + t_opt / 10, 100)
     ]
     # logging...
     print("Optimal value of t:", t_opt)
@@ -137,7 +144,8 @@ for file in os.listdir("csv"):
         np.linspace(0, x_max, 100),
         y_fit,
         c="grey",
-        label=r"fit, $y=(0.5)^{x/t}$" + f", t={t_opt:.3f} ± {abs(t_opt - t1):.5f}\nconfidence = 0.68",
+        label=r"fit, $y=(0.5)^{x/t}$"
+        + f", t={t_opt:.3f} ± {abs(t_opt - t1):.5f}\nconfidence = 0.68",
     )
     plt.xlabel(
         "Layers of tissue" if absorber == "tissue" else f"Thickness of {absorber} (in)"
@@ -149,22 +157,29 @@ for file in os.listdir("csv"):
 
     # plot the s-value vs t curve
     plt.subplot(122)
-    plt.plot(np.linspace(t_opt -t_opt/10, t_opt + t_opt/10, 100), s_values, c="grey", label="s-value vs t curve")
+    plt.plot(
+        np.linspace(t_opt - t_opt / 10, t_opt + t_opt / 10, 100),
+        s_values,
+        c="grey",
+        label="s-value vs t curve",
+    )
     plt.xlabel("t")
     plt.ylabel("s-value")
     plt.title("s-value vs t")
     plt.grid()
     # plot the minimum value of s achieved and the two points used to calculate the uncertainty in t
     plt.plot(t_opt, result.fun, "ro", label=f"Lowest s value: {result.fun:.3f}")
-    plt.plot(t1, s_statistic(t1, x, y, uncertainty),c="black", marker="o")
+    plt.plot(t1, s_statistic(t1, x, y, uncertainty), c="black", marker="o")
     plt.plot(t2, s_statistic(t2, x, y, uncertainty), c="black", marker="o")
     # plot the expected value of s as a line
-    plt.axhline(len(x) - 1, color="cornflowerblue", label=f"Expected value of s: {len(x) - 1}")
+    plt.axhline(
+        len(x) - 1, color="cornflowerblue", label=f"Expected value of s: {len(x) - 1}"
+    )
     plt.legend()
-    
+
     # save the plot to file
     plt.savefig(f"plots/{source}_{absorber}.png")
-    
+
     # save relevant information to an excel file
     df_data = pd.DataFrame(
         {
